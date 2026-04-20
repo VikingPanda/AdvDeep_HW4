@@ -102,7 +102,11 @@ class CLIP(nn.Module):
         self.vision_encoder = vision_encoder
         self.text_encoder = text_encoder
         # TODO: implement the rest components
-        raise NotImplementedError("Not implemented")
+        self.projection_vision = nn.Linear(vision_encoder.config.hidden_size, proj_dim)
+        self.projection_text = nn.Linear(text_encoder.config.hidden_size, proj_dim)
+        self.logit_scale = nn.Parameter(torch.ones([]) * torch.log(torch.tensor(1 / temperature)))
+
+
 
     def encode_image(self, image: torch.Tensor) -> torch.Tensor:
         return self.vision_encoder(image)
@@ -189,7 +193,10 @@ class CLIP(nn.Module):
         #3 lines image embeddings, 3 for text embeddings, and 3 for projection and 1 for logits
         image_embeddings = self.encode_image(pixel_values)
         text_embeddings = self.encode_text(input_ids)
-        raise NotImplementedError("Not implemented")
+        projected_image = self.projection_vision(image_embeddings)
+        projected_text = self.projection_text(text_embeddings)
+        return projected_image, projected_text, self.logit_scale.exp()
+    
 
 #Generate data and write code for model
 #generating captions is easier than generating QA pairs, so we can start with that, and then move on to generating QA pairs
@@ -211,7 +218,23 @@ def compute_clip_loss(
     Returns:
         The loss for the CLIP model.
     """
-    raise NotImplementedError("Not implemented")
+    projected_image, projected_text, logit_scale = outputs
+    # compute cosine similarity between projected image and text features
+    # compute loss based on the cosine similarity and the labels (which indicate which text corresponds to which image)
+    # you can use the logit_scale to scale the cosine similarity before computing the loss
+    # return the computed loss
+    #compute cosine similarity between projected image and text features
+    #compute loss based on the cosine similarity and the labels (which indicate which text corresponds to which image)
+    #you can use the logit_scale to scale the cosine similarity before computing the loss
+    #return the computed loss
+
+    batch_size = projected_image.shape[0]
+    labels = torch.arange(batch_size).to(projected_image.device)
+    logits_per_image = logit_scale * torch.matmul(projected_image, projected_text.T)
+    loss_i = nn.CrossEntropyLoss()(logits_per_image, labels)
+    logits_per_text = logit_scale * torch.matmul(projected_text, projected_image.T)
+    loss_t = nn.CrossEntropyLoss()(logits_per_text, labels)
+    return (loss_i + loss_t) / 2.0
 
 
 def get_target_modules_for_lora(model: nn.Module) -> list[str]:
@@ -231,7 +254,7 @@ def get_target_modules_for_lora(model: nn.Module) -> list[str]:
 def train(
     data_dir: Path | None = None,
     output_dir: str = "clip",
-    num_train_epochs: float = 0.05,  # for debugging purpose, increase this once the dry run works
+    num_train_epochs: float = 0.25,  # for debugging purpose, increase this once the dry run works
     per_device_train_batch_size: int = 1024,
     gradient_accumulation_steps: int = 1,
     learning_rate: float = 5e-4,
@@ -366,7 +389,7 @@ def test(ckpt_path: str, val_dataset: str = "valid_grader"):
 def main():
     from fire import Fire
 
-    Fire({"train": train, "test": test})
+    Fire({"train": train, "test": test,"demo_train": demo_train})
 
 
 if __name__ == "__main__":

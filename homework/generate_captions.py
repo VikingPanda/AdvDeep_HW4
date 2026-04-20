@@ -3,7 +3,8 @@ import json
 import fire
 from matplotlib import pyplot as plt
 
-from .generate_qa import draw_detections, extract_frame_info
+#from .generate_qa import draw_detections, extract_frame_info
+from generate_qa import draw_detections, extract_frame_info, extract_kart_objects, extract_track_info
 
 
 def generate_caption(info_path: str, view_index: int, img_width: int = 150, img_height: int = 100) -> list:
@@ -11,11 +12,12 @@ def generate_caption(info_path: str, view_index: int, img_width: int = 150, img_
     Generate caption for a specific view.
     """
     output = []
-    kart_objects = draw_detections(info_path, view_index, return_kart_objects=True)
+    kart_objects = extract_kart_objects(info_path, view_index)
     image_file = list(Path(info_path).parent.glob(f"{Path(info_path).stem.replace('_info', '')}_{view_index:02d}_im.jpg"))[0]
     image_file = str(image_file)[8:]
     num_karts = len(kart_objects)
-    track_name = extract_frame_info(info_path)[1]
+    track_name = extract_track_info(info_path)
+    ego_cart = next((kart for kart in kart_objects if kart["is_center_kart"]), None)
 
     # Generate captions based on the extracted information
     # 1. Ego car
@@ -40,8 +42,10 @@ def generate_caption(info_path: str, view_index: int, img_width: int = 150, img_
     output.append({"caption": c3, "image_file": image_file})
 
     # Additional captions based on relative positions of karts
-    kart_front = [k for k in kart_objects if k["relative_position"] == "front"]
-    kart_back = [k for k in kart_objects if k["relative_position"] == "back"]
+    kart_left = [kart for kart in kart_objects if kart["center"][0] < ego_cart["center"][0]]
+    kart_right = [kart for kart in kart_objects if kart["center"][0] > ego_cart["center"][0]]
+    kart_front = [kart for kart in kart_objects if kart["center"][1] < ego_cart["center"][1]]
+    kart_back = [kart for kart in kart_objects if kart["center"][1] > ego_cart["center"][1]]
 
     # 4. Relative position
     c4 = str(len(kart_front))
@@ -98,12 +102,12 @@ def generate_captions():
     # Loop through all info files and views, generate captions, and save to a new JSON file for training
     print("Generating captions...")
     data_dir = Path("../data/tux_train")
-    output_dir = Path("../data/train_ca")
+    output_dir = Path("../data/train")
     output_dir.mkdir(exist_ok=True)
 
-    info_files = list(data_dir.glob("*/*_info.json"))
+    info_files = list(data_dir.glob("*_info.json"))
     for info_file in info_files:
-        for view_index in range(4):
+        for view_index in range(10): # Assuming there are 10 views (0-9) for each info file
             captions = generate_caption(str(info_file), view_index)
             output_file = output_dir / f"{info_file.stem}_view{view_index}_captions.json"
             with open(output_file, "w") as f:
