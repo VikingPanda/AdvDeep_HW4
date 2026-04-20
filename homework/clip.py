@@ -192,10 +192,10 @@ class CLIP(nn.Module):
         #getting pixel values of image-> pass through vision encoder to get vision features
         #return vision features, text features, and logit values (for loss computation)
         #3 lines image embeddings, 3 for text embeddings, and 3 for projection and 1 for logits
-        image_embeddings = self.encode_image(pixel_values)
-        text_embeddings = self.encode_text(input_ids**attention_mask)  # mask the input ids to get the correct text features
+        image_embeddings = self.vision_encoder(pixel_values).last_hidden_state[:, 0, :]
+        text_embeddings = self.text_encoder(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state[:, 0, :]
         projected_image = self.projection_vision(image_embeddings)
-        projected_text = self.projection_text(text_embeddings)
+        projected_text = self.projection_text(text_embeddings)  
         
         return projected_image, projected_text, self.logit_scale.exp()
     
