@@ -105,6 +105,7 @@ class CLIP(nn.Module):
         self.projection_vision = nn.Linear(vision_encoder.config.hidden_size, proj_dim)
         self.projection_text = nn.Linear(text_encoder.config.hidden_size, proj_dim)
         self.logit_scale = nn.Parameter(torch.ones([]) * torch.log(torch.tensor(1 / temperature)))
+        # if linear argument must be a tensor not BaseModelOutput, then we need to change
 
 
 
@@ -192,9 +193,10 @@ class CLIP(nn.Module):
         #return vision features, text features, and logit values (for loss computation)
         #3 lines image embeddings, 3 for text embeddings, and 3 for projection and 1 for logits
         image_embeddings = self.encode_image(pixel_values)
-        text_embeddings = self.encode_text(input_ids)
+        text_embeddings = self.encode_text(input_ids**attention_mask)  # mask the input ids to get the correct text features
         projected_image = self.projection_vision(image_embeddings)
         projected_text = self.projection_text(text_embeddings)
+        
         return projected_image, projected_text, self.logit_scale.exp()
     
 
